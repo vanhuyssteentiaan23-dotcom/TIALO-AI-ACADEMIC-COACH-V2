@@ -1,5 +1,26 @@
+import { cookies } from 'next/headers';
+
+async function hasActiveSubscription() {
+  if (process.env.TIALO_REQUIRE_SUBSCRIPTION !== 'true') return true;
+  const key = process.env.STRIPE_SECRET_KEY;
+  const store = await cookies();
+  const sessionId = store.get('tialo_subscription')?.value;
+  if (!key || !sessionId) return false;
+  try {
+    const r = await fetch(`https://api.stripe.com/v1/checkout/sessions/${encodeURIComponent(sessionId)}?expand[]=subscription`, {
+      headers: { Authorization: `Bearer ${key}` }, cache: 'no-store'
+    });
+    if (!r.ok) return false;
+    const session = await r.json();
+    return session.status === 'complete' && ['active', 'trialing'].includes(session.subscription?.status);
+  } catch { return false; }
+}
+
 export async function POST(request) {
   try {
+    if (!(await hasActiveSubscription())) {
+      return Response.json({ error: 'TIALO Pro is required for AI Tutor. Start or restore your subscription at /pricing.' }, { status: 402 });
+    }
     const { messages = [], subject = '', materials = '' } = await request.json();
     const key = process.env.OPENAI_API_KEY;
     if (!key) return Response.json({ error: 'OPENAI_API_KEY is not configured in Vercel.' }, { status: 500 });
@@ -15,7 +36,7 @@ export async function POST(request) {
     const data = await r.json();
     if (!r.ok) return Response.json({error:data?.error?.message||'AI request failed.'},{status:r.status});
     return Response.json({message:data.choices?.[0]?.message?.content||'No response.'});
-  } catch (e) {
+  } catch {
     return Response.json({error:'Invalid request.'},{status:400});
   }
 }
