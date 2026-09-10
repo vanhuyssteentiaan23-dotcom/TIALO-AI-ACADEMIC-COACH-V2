@@ -1,4 +1,5 @@
 import './globals.css';
+import './launch.css';
 
 export const metadata = { title: 'TIALO — AI Academic Coach', description: 'A focused academic coaching workspace.' };
 
