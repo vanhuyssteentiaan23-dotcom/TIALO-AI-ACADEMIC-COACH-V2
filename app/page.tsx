@@ -1,1 +1,0 @@
-export default function Home(){return <main><h1>TIALO</h1><p>AI Academic Coach</p></main>}
